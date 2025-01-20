@@ -25,7 +25,7 @@ class KKTLinearODEParameterEstimator(AbstractODESolver):
         self.number_of_parameters = len(model.parameters)
 
         self.all_variables = symbols(model.variables)
-        self.all_parameters = symbols(model.parameters)
+        self.all_parameters = symbols(list(model.parameters.keys()))
 
         self.parameters_name = list(model.parameters.keys())
 
@@ -171,12 +171,12 @@ class KKTLinearODEParameterEstimator(AbstractODESolver):
             rhs = constraint.rhs
 
             # Ensure both lhs and rhs are valid parameters
-            if lhs not in self.parameters_name or rhs not in self.parameters_name:
+            if lhs.name not in self.parameters_name or rhs.name not in self.parameters_name:
                 raise ValueError(f"Both sides of the constraint {constraint} must be valid parameter names.")
 
             # Get the indices of the parameters
-            i = self.parameters_name.index(lhs)
-            j = self.parameters_name.index(rhs)
+            i = self.parameters_name.index(lhs.name)
+            j = self.parameters_name.index(rhs.name)
 
             # Build rij and cij vectors
             ri = np.zeros(self.number_of_parameters)
@@ -185,6 +185,8 @@ class KKTLinearODEParameterEstimator(AbstractODESolver):
 
             r_vectors[(i, j)] = ri
             c_vectors[(i, j)] = ri.T
+
+        return r_vectors, c_vectors
 
     def _build_system_matrix(self, normal_matrices, r_vectors, c_vectors):
         """

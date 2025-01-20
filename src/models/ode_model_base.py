@@ -17,8 +17,8 @@ class ODEModelBase(ABC):
         self.functions: List[Callable] = []  # List of equation functions
         self.variables: List[str] = []   # List of variable names
         self.parameters: Dict[str, float] = {}  # Dictionary of parameter names and values
-        self.constraints: List[Constraint] = []  # List of constraint objects (Eq, Lt, Gt)
-        self.initial_conditions: Dict[str, float] = {}
+        self.constraints: List[Constraint] = []  # List of constraint objects (Eq, Lt, Gt, Le, Ge)
+        self.initial_conditions: Dict[str, float] = {} # Dictionary of initial conditions names and values
 
     @abstractmethod
     def set_equations(self, equations) -> None:
@@ -43,6 +43,13 @@ class ODEModelBase(ABC):
 
     @abstractmethod
     def set_constraints(self, constraints) -> None:
+        """
+        Abstract method to set the constraints for the model.
+        """
+        pass
+
+    @abstractmethod
+    def set_initial_conditions(self, constraints) -> None:
         """
         Abstract method to set the constraints for the model.
         """

@@ -1,10 +1,12 @@
 import json
 import matplotlib.pyplot as plt
 import os
+
+import numpy as np
 import yaml
 from scipy.integrate import odeint
 
-from sympy import symbols, Eq, sympify, lambdify
+from sympy import symbols, Eq, sympify, lambdify, solve
 from typing import List, Dict, Tuple
 
 from src.models.ode_model_base import Constraint, ODEModelBase
@@ -16,17 +18,16 @@ class ODEModel(ODEModelBase):
     """
 
     def __init__(self, equations: List[str], variables: List[str], parameters: Dict[str, float],
-                 constraints: List[str] = None, initial_conditions: List[str] | Dict[str, float] = None):
+                 initial_conditions: List[str] | Dict[str, float], constraints: List[str] = None):
         super().__init__()
 
         # Initialize the properties using the setter methods
         self.set_variables(variables)
         self.set_parameters(parameters)
         self.set_constraints(constraints or [])
+        self.set_initial_conditions(initial_conditions)
         self.set_equations(equations)
 
-        if initial_conditions:
-            self.set_initial_conditions(initial_conditions)
 
     def set_equations(self, equations: List[str]) -> None:
         """
@@ -35,10 +36,17 @@ class ODEModel(ODEModelBase):
         Args:
             equations (List[str]): List of string representations of the equations.
         """
-        all_symbols = symbols(self.variables + list(self.parameters.keys()))
 
-        self.equations = [sympify(eq, evaluate=False) for eq in equations]
-        self.functions = [lambdify(all_symbols, expr) for expr in self.equations]
+        variables = symbols(self.variables)
+        parameters = symbols(list(self.parameters.keys()))
+
+        self.equations = [
+            sympify(eq, evaluate=False, locals={**{parameter.name: parameter for parameter in parameters},
+                                                **{variable.name: variable for variable in variables}})
+            for eq in equations
+        ]
+
+        self.functions = [lambdify(variables + parameters, expr) for expr in self.equations]
 
     def set_variables(self, variables: List[str]) -> None:
         """
@@ -49,14 +57,15 @@ class ODEModel(ODEModelBase):
         """
         self.variables = variables
 
-    def set_parameters(self, parameters: Dict[str, float]) -> None:
+    def set_parameters(self, parameters: Dict[str, float] | List[str]) -> None:
         """
         Set the parameters for the model.
 
         Args:
-            parameters (Dict[str, float]): Dictionary of parameters and their values.
+            parameters (Dict[str, float] or List[str]): Parameters as strings or as a dictionary of
+                variable-value pairs.
         """
-        self.parameters = parameters
+        self.parameters = self._initial_values(parameters, "parameters")
 
     def set_constraints(self, constraints: List[str]) -> None:
         """
@@ -68,7 +77,7 @@ class ODEModel(ODEModelBase):
         # Convert each constraint string to the corresponding sympy relational expression
         self.constraints = [self.parse_constraint(c) for c in constraints]
 
-    def set_initial_conditions(self, initial_conditions) -> None:
+    def set_initial_conditions(self, initial_conditions: Dict[str, float] | List[str]) -> None:
         """
         Set the initial conditions for the dependent variables, either from a dictionary or a list of strings.
 
@@ -76,14 +85,7 @@ class ODEModel(ODEModelBase):
             initial_conditions (Dict[str, float] or List[str]): Initial conditions as strings or as a dictionary of
                 variable-value pairs.
         """
-        if isinstance(initial_conditions, list):
-            # Parse the list of string initial conditions
-            self.initial_conditions = {self._parse_initial_condition(cond) for cond in initial_conditions}
-        elif isinstance(initial_conditions, dict):
-            # Use the provided dictionary of initial conditions directly
-            self.initial_conditions = initial_conditions
-        else:
-            raise ValueError("Initial conditions must be either a dictionary or a list of strings.")
+        self.initial_conditions = self._initial_values(initial_conditions, "initial conditions")
 
     @classmethod
     def _load_model_data(cls, data):
@@ -101,16 +103,17 @@ class ODEModel(ODEModelBase):
         """
 
         # Check if the required keys are present in the data
-        required_keys = ['equations', 'variables']
+        required_keys = ['equations', 'variables', 'initial-conditions']
         for key in required_keys:
             if key not in data:
                 raise ValueError(f"Missing required key: {key}")
 
-        equations = [sympify(eq, evaluate=False) for eq in data['equations']]
         variables = [symbols(var) for var in data['variables']]
+        initial_conditions = data['initial-conditions']
         parameters = data.get('parameters', {})
+        equations = data['equations']
         constraints = data.get('constraints', [])
-        return equations, variables, parameters, constraints
+        return equations, variables, parameters, initial_conditions, constraints
 
     @classmethod
     def from_json(cls, file_path):
@@ -138,8 +141,7 @@ class ODEModel(ODEModelBase):
             except json.JSONDecodeError:
                 raise ValueError(f"The file at {file_path} is not a valid JSON file.")
 
-        equations, variables, parameters, constraints = cls._load_model_data(data)
-        return cls(equations, variables, parameters, constraints)
+        return cls(*cls._load_model_data(data))
 
     @classmethod
     def from_yaml(cls, file_path):
@@ -167,8 +169,7 @@ class ODEModel(ODEModelBase):
             except yaml.YAMLError:
                 raise ValueError(f"The file at {file_path} is not a valid YAML file.")
 
-        equations, variables, parameters, constraints = cls._load_model_data(data)
-        return cls(equations, variables, parameters, constraints)
+        return cls(*cls._load_model_data(data))
 
     @classmethod
     def from_dict(cls, data):
@@ -182,11 +183,10 @@ class ODEModel(ODEModelBase):
         Returns:
             ODEModel: Initialized model object.
         """
-        equations, variables, parameters, constraints = cls._load_model_data(data)
-        return cls(equations, variables, parameters, constraints)
 
-    @staticmethod
-    def parse_constraint(constraint_str: str) -> Constraint:
+        return cls(*cls._load_model_data(data))
+
+    def parse_constraint(self, constraint_str: str) -> Constraint:
         """
         Parse an equality or inequality string and return the corresponding sympy relational expression.
 
@@ -199,31 +199,78 @@ class ODEModel(ODEModelBase):
         Raises:
             ValueError: If the string format is invalid.
         """
-        constraint = sympify(constraint_str, evaluate=False)
+        constraint = sympify(constraint_str, evaluate=False,
+                             locals= {parameter.name: parameter for parameter in symbols(list(self.parameters.keys()))})
 
         if isinstance(constraint, Constraint):
             return constraint
         else:
             raise ValueError(f"Invalid constraint: {constraint}. Must be an equality or inequality.")
 
-    @staticmethod
-    def _parse_initial_condition(condition: str) -> Tuple[str, float]:
+    def _initial_values(self, input_values: Dict[str, float] | List[str], input_type: str) -> Dict[str, float]:
         """
-        Parse an initial condition string into a sympy expression and extract the variable and value.
+        Convert a list of initial condition strings or a dictionary into a dictionary of initial values.
 
         Args:
-            condition (str): Initial condition as a string, e.g., 'x = 1' or 'y = 0'.
+            input_values (Dict[str, float] | List[str]): Either a dictionary of initial values
+                or a list of strings in the format 'variable = value'.
+            input_type (str): A description of the input type (used for error messages).
 
         Returns:
-            tuple: A tuple (variable, value) representing the initial condition.
-        """
-        condition = condition.replace(' ', '')
-        eq = sympify(condition)
+            Dict[str, float]: A dictionary mapping variable names to their corresponding values.
 
-        if isinstance(eq, Eq):
-            return eq.lhs, eq.rhs
+        Raises:
+            ValueError: If `input_values` is not a dictionary or a list of strings, or if any string
+                cannot be parsed correctly.
+        """
+        if isinstance(input_values, list):
+            # Parse the list of strings into a dictionary of variable-value pairs
+            return {
+                variable: value
+                for condition in input_values
+                for variable, value in [self._parse_equality_values(condition, input_type)]
+            }
+        elif isinstance(input_values, dict):
+            # Return the provided dictionary directly
+            return input_values
         else:
-            raise ValueError(f"Invalid initial condition: {condition}. Must be of the form 'var = value'.")
+            raise ValueError(f"{input_type} must be either a dictionary or a list of strings.")
+
+    def _parse_equality_values(self, condition: str, input_type: str) -> Tuple[str, float]:
+        """
+        Parse a single string representing an equality into a sympy expression and extract the variable and value.
+
+        Args:
+            condition (str): An equality string, e.g., 'x = 1' or 'y = 0'.
+            input_type (str): A description of the input type (used for error messages).
+
+        Returns:
+            Tuple[str, float]: A tuple (variable, value) extracted from the equality string.
+
+        Raises:
+            ValueError: If the string is not in the expected format, or if the equality cannot be parsed.
+        """
+        # Remove whitespace from the condition string
+        condition = condition.replace(' ', '')
+        equation = sympify(condition,
+                           locals= {variable: symbols(variable) for variable in self.variables + list(self.parameters.keys())})
+
+        if not isinstance(equation, Eq):
+            raise ValueError(f"Invalid {input_type}: '{condition}'. Must be an equation (e.g., 'x = value').")
+
+            # Ensure the equation is linear and involves only one variable
+        variables = equation.free_symbols
+        if len(variables) != 1:
+            raise ValueError(f"Invalid {input_type}: '{condition}'. Must contain exactly one variable.")
+
+        # Solve for the variable
+        variable = next(iter(variables))  # Extract the single variable
+        solution = solve(equation, variable)
+
+        if len(solution) != 1:
+            raise ValueError(f"Invalid {input_type}: '{condition}'. Must have a unique solution.")
+
+        return str(variable), float(solution[0])
 
     @staticmethod
     def graph(independent_var, dependent_vars, title: str = "ODE System Solution",
@@ -350,7 +397,7 @@ class ODEModel(ODEModelBase):
                 A list of the derivatives of the system evaluated at the given point.
         """
 
-        return [f(independent_value, *dependent_values) for f in self.functions]
+        return [f(independent_value, *dependent_values, *self.parameters.values()) for f in self.functions]
 
     def integrate_system(self, independent_values: List[float]):
         """
@@ -363,4 +410,7 @@ class ODEModel(ODEModelBase):
             The result of integrating the system of differential equations.
         """
 
-        return odeint(self.compute_derivatives, self.initial_conditions, independent_values)
+        dependent_values = odeint(self.compute_derivatives, list(self.initial_conditions.values()), independent_values)
+        result = np.column_stack((independent_values, dependent_values))
+
+        return result
