@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from sympy import Eq, Lt, Gt, Le, Ge, Expr
+from sympy import Eq, Lt, Gt, Le, Ge, Expr, Symbol
 from typing import List, Dict, Callable, Union
 
 # Constraint types could be Eq, Lt, Gt, Le, Ge from sympy.
@@ -15,8 +15,14 @@ class ODEModelBase(ABC):
         # Define properties with specific types
         self.equations: List[Expr] = []  # List of equation expressions
         self.functions: List[Callable] = []  # List of equation functions
+
         self.variables: List[str] = []   # List of variable names
-        self.parameters: Dict[str, float] = {}  # Dictionary of parameter names and values
+        self.variable_symbols: List[Symbol] = []  # List of variable symbols
+
+        self.parameter_names: List[str] = [] #List of parameters names
+        self.parameter_symbols: List[Symbol] = []  # List of parameter symbols
+        self.parameters: Dict[str, float] = {}  # Dictionary of parameter names and
+
         self.constraints: List[Constraint] = []  # List of constraint objects (Eq, Lt, Gt, Le, Ge)
         self.initial_conditions: Dict[str, float] = {} # Dictionary of initial conditions names and values
 
@@ -35,7 +41,7 @@ class ODEModelBase(ABC):
         pass
 
     @abstractmethod
-    def set_parameters(self, parameters) -> None:
+    def set_parameters(self, parameters, parameters_names) -> None:
         """
         Abstract method to set the parameters for the model.
         """

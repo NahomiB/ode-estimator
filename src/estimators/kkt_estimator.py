@@ -2,7 +2,7 @@ import numpy as np
 import sympy as sp
 
 from scipy.linalg import block_diag
-from sympy import Eq, symbols, lambdify
+from sympy import Eq, lambdify
 
 from src.estimators.estimator import AbstractODESolver
 from src.models.ode_model import ODEModel
@@ -22,12 +22,7 @@ class KKTLinearODEParameterEstimator(AbstractODESolver):
         super().__init__(model, ode_results, solver)
 
         self.number_of_constraints = len(model.constraints)
-        self.number_of_parameters = len(model.parameters)
-
-        self.all_variables = symbols(model.variables)
-        self.all_parameters = symbols(list(model.parameters.keys()))
-
-        self.parameters_name = list(model.parameters.keys())
+        self.number_of_parameters = len(model.parameter_names)
 
         self.callables_per_equation = [self._extract_callables(equation) for equation in self.model.equations]
 
@@ -37,7 +32,7 @@ class KKTLinearODEParameterEstimator(AbstractODESolver):
         """Expand and analyze terms in a given equation."""
         expanded_eq = sp.expand(equation)
         for term in expanded_eq.as_ordered_terms():
-            yield term, [symbol for symbol in self.all_parameters if term.has(symbol)]
+            yield term, [symbol for symbol in self.model.parameter_symbols if term.has(symbol)]
 
     @staticmethod
     def _verify_term_linearity(term, involved_params, equation_index):
@@ -77,10 +72,10 @@ class KKTLinearODEParameterEstimator(AbstractODESolver):
         # Iterate over the terms
         for term in terms:
             # Check if the term contains a parameter
-            for param in self.all_parameters:
+            for param in self.model.parameter_symbols:
                 if param in term.free_symbols:
                     factor = term / param
-                    callables.append(lambdify(self.all_variables, factor, modules=["numpy"]))
+                    callables.append(lambdify(self.model.variable_symbols, factor, modules=["numpy"]))
                     break
 
         return callables
@@ -171,12 +166,12 @@ class KKTLinearODEParameterEstimator(AbstractODESolver):
             rhs = constraint.rhs
 
             # Ensure both lhs and rhs are valid parameters
-            if lhs.name not in self.parameters_name or rhs.name not in self.parameters_name:
+            if lhs.name not in self.model.parameter_names or rhs.name not in self.model.parameter_names:
                 raise ValueError(f"Both sides of the constraint {constraint} must be valid parameter names.")
 
             # Get the indices of the parameters
-            i = self.parameters_name.index(lhs.name)
-            j = self.parameters_name.index(rhs.name)
+            i = self.model.parameter_names.index(lhs.name)
+            j = self.model.parameter_names.index(rhs.name)
 
             # Build rij and cij vectors
             ri = np.zeros(self.number_of_parameters)
@@ -268,4 +263,7 @@ class KKTLinearODEParameterEstimator(AbstractODESolver):
             raise ValueError(f"Error solving the system with solver {self.solver.__name__}. "
                              f"Exception: {str(e)}") from e
 
-        return solution[:self.number_of_parameters]  # Return estimated parameters
+        estimated_parameters = { self.model.parameter_names[i]: float(value) for i, value in enumerate(solution[:self.number_of_parameters])}
+        self.model.set_parameters(estimated_parameters, [])
+
+        return estimated_parameters

@@ -17,15 +17,15 @@ class ODEModel(ODEModelBase):
     Concrete implementation of ODEModel based on the abstract base class ODEModelBase.
     """
 
-    def __init__(self, equations: List[str], variables: List[str], parameters: Dict[str, float],
-                 initial_conditions: List[str] | Dict[str, float], constraints: List[str] = None):
+    def __init__(self, equations: List[str], variables: List[str], initial_conditions: List[str] | Dict[str, float] = None,
+                  parameters: List[str] | Dict[str, float] = None, parameters_names : List[str] = None,
+                 constraints: List[str] = None):
         super().__init__()
 
-        # Initialize the properties using the setter methods
         self.set_variables(variables)
-        self.set_parameters(parameters)
+        self.set_parameters(parameters or {}, parameters_names or [])
         self.set_constraints(constraints or [])
-        self.set_initial_conditions(initial_conditions)
+        self.set_initial_conditions(initial_conditions or {})
         self.set_equations(equations)
 
 
@@ -37,16 +37,13 @@ class ODEModel(ODEModelBase):
             equations (List[str]): List of string representations of the equations.
         """
 
-        variables = symbols(self.variables)
-        parameters = symbols(list(self.parameters.keys()))
-
         self.equations = [
-            sympify(eq, evaluate=False, locals={**{parameter.name: parameter for parameter in parameters},
-                                                **{variable.name: variable for variable in variables}})
+            sympify(eq, evaluate=False, locals={**{parameter.name: parameter for parameter in self.parameter_symbols},
+                                                **{variable.name: variable for variable in self.variable_symbols}})
             for eq in equations
         ]
 
-        self.functions = [lambdify(variables + parameters, expr) for expr in self.equations]
+        self.functions = [lambdify(self.variable_symbols + self.parameter_symbols, expr) for expr in self.equations]
 
     def set_variables(self, variables: List[str]) -> None:
         """
@@ -56,15 +53,20 @@ class ODEModel(ODEModelBase):
             variables (List[str]): List of variables in the ODE model.
         """
         self.variables = variables
+        self.variable_symbols = symbols(variables)
 
-    def set_parameters(self, parameters: Dict[str, float] | List[str]) -> None:
+    def set_parameters(self, parameters: Dict[str, float] | List[str], parameter_names: List[str]) -> None:
         """
         Set the parameters for the model.
 
         Args:
             parameters (Dict[str, float] or List[str]): Parameters as strings or as a dictionary of
                 variable-value pairs.
+            parameter_names (List[str]): Names of the parameters in the ODE model.
         """
+        self.parameter_names = list(set(parameter_names) | self._get_parameters_names(parameters))
+        self.parameter_symbols = symbols(self.parameter_names)
+
         self.parameters = self._initial_values(parameters, "parameters")
 
     def set_constraints(self, constraints: List[str]) -> None:
@@ -103,17 +105,21 @@ class ODEModel(ODEModelBase):
         """
 
         # Check if the required keys are present in the data
-        required_keys = ['equations', 'variables', 'initial-conditions']
+        required_keys = ['equations', 'variables']
         for key in required_keys:
             if key not in data:
                 raise ValueError(f"Missing required key: {key}")
 
         variables = [symbols(var) for var in data['variables']]
-        initial_conditions = data['initial-conditions']
+
         parameters = data.get('parameters', {})
+        parameters_names = data.get('parameter_names', [])
+
+        initial_conditions = data.get('initial-conditions', {})
         equations = data['equations']
         constraints = data.get('constraints', [])
-        return equations, variables, parameters, initial_conditions, constraints
+
+        return equations, variables, initial_conditions, parameters, parameters_names, constraints
 
     @classmethod
     def from_json(cls, file_path):
@@ -200,12 +206,22 @@ class ODEModel(ODEModelBase):
             ValueError: If the string format is invalid.
         """
         constraint = sympify(constraint_str, evaluate=False,
-                             locals= {parameter.name: parameter for parameter in symbols(list(self.parameters.keys()))})
+                             locals= {variable.name: variable for variable in self.parameter_symbols + self.variable_symbols})
 
         if isinstance(constraint, Constraint):
             return constraint
         else:
             raise ValueError(f"Invalid constraint: {constraint}. Must be an equality or inequality.")
+
+    @staticmethod
+    def _get_parameters_names(input_values: Dict[str, float] | List[str]):
+
+        if isinstance(input_values, dict):
+            return input_values.keys()
+        elif isinstance(input_values, list):
+            return {item.split('=')[0].strip() for item in input_values}
+        else:
+            raise ValueError(f"Parameters must be either a dictionary or a list of strings.")
 
     def _initial_values(self, input_values: Dict[str, float] | List[str], input_type: str) -> Dict[str, float]:
         """
@@ -253,7 +269,7 @@ class ODEModel(ODEModelBase):
         # Remove whitespace from the condition string
         condition = condition.replace(' ', '')
         equation = sympify(condition,
-                           locals= {variable: symbols(variable) for variable in self.variables + list(self.parameters.keys())})
+                           locals= {variable.name: variable for variable in self.parameter_symbols + self.variable_symbols})
 
         if not isinstance(equation, Eq):
             raise ValueError(f"Invalid {input_type}: '{condition}'. Must be an equation (e.g., 'x = value').")
@@ -376,6 +392,9 @@ class ODEModel(ODEModelBase):
         if len(y) != len(self.variables):
             raise ValueError("Mismatch between number of variables and input values.")
 
+        if len(self.parameters) != len(self.parameter_names):
+            raise ValueError("Mismatch between number of parameters and input values.")
+
         # Map variables and parameters to their corresponding values
         values: dict[str, float] = {var: val for var, val in zip(self.variables, y)}
         values.update({param: val for param, val in self.parameters.items()})
@@ -385,7 +404,7 @@ class ODEModel(ODEModelBase):
 
         return results
 
-    def compute_derivatives(self, dependent_values: List[float], independent_value: float):
+    def _compute_derivatives(self, dependent_values: List[float], independent_value: float):
         """
             Calculates the derivatives of the ODE system at a given point using the defined functions.
 
@@ -410,7 +429,13 @@ class ODEModel(ODEModelBase):
             The result of integrating the system of differential equations.
         """
 
-        dependent_values = odeint(self.compute_derivatives, list(self.initial_conditions.values()), independent_values)
+        if len(self.parameters) != len(self.parameter_names):
+            raise ValueError("Mismatch between number of parameters and input values.")
+
+        if len(self.initial_conditions) == 0:
+            raise ValueError("Initial conditions cannot be empty.")
+
+        dependent_values = odeint(self._compute_derivatives, list(self.initial_conditions.values()), independent_values)
         result = np.column_stack((independent_values, dependent_values))
 
         return result
