@@ -1,12 +1,15 @@
 import json
+
 import matplotlib.pyplot as plt
 import os
 
 import numpy as np
+import sympy
 import yaml
-from scipy.integrate import odeint
 
 from sympy import symbols, Eq, sympify, lambdify, solve
+from sympy.printing import sstr
+
 from typing import List, Dict, Tuple
 
 from src.models.ode_model_base import Constraint, ODEModelBase
@@ -17,13 +20,15 @@ class ODEModel(ODEModelBase):
     Concrete implementation of ODEModel based on the abstract base class ODEModelBase.
     """
 
-    def __init__(self, equations: List[str], variables: List[str], initial_conditions: List[str] | Dict[str, float] = None,
+    def __init__(self, equations: List[str], dependent_variables: List[str],  independent_variable:str = "t", initial_conditions: List[str] | Dict[str, float] = None,
                   parameters: List[str] | Dict[str, float] = None, parameters_names : List[str] = None,
-                 constraints: List[str] = None):
+                  constraints: List[str] = None, inputs: List[str] | Dict[str, float] = None, outputs: List[str]= None,):
         super().__init__()
 
-        self.set_variables(variables)
+        self.set_variables(dependent_variables, independent_variable)
         self.set_parameters(parameters or {}, parameters_names or [])
+        self.set_inputs(inputs or {})
+        self.set_outputs(outputs or [])
         self.set_constraints(constraints or [])
         self.set_initial_conditions(initial_conditions or {})
         self.set_equations(equations)
@@ -37,23 +42,35 @@ class ODEModel(ODEModelBase):
             equations (List[str]): List of string representations of the equations.
         """
 
+        # Parse equations into symbolic expressions
         self.equations = [
-            sympify(eq, evaluate=False, locals={**{parameter.name: parameter for parameter in self.parameter_symbols},
-                                                **{variable.name: variable for variable in self.variable_symbols}})
+            sympify(
+                eq,
+                evaluate=False,
+                locals={ self.independent_variable.name : self.independent_variable,
+                        **{p.name: p for p in self.parameter_symbols},
+                        **{v.name: v for v in self.variable_symbols},
+                        **{i.name: i for i in self.inputs_symbols}}
+            )
             for eq in equations
         ]
 
-        self.functions = [lambdify(self.variable_symbols + self.parameter_symbols, expr) for expr in self.equations]
+        self.functions = [
+            lambdify([self.independent_variable] + self.variable_symbols + self.parameter_symbols + self.inputs_symbols, expr)
+            for expr in self.equations
+        ]
 
-    def set_variables(self, variables: List[str]) -> None:
+    def set_variables(self, variables: List[str], independent_variable: str) -> None:
         """
         Set the variables for the model.
 
         Args:
             variables (List[str]): List of variables in the ODE model.
+            independent_variable (str): Name of the independent variable.
         """
-        self.variables = variables
-        self.variable_symbols = symbols(variables)
+        self.independent_variable = symbols(independent_variable)
+        self.variables = sorted(variables)
+        self.variable_symbols = sorted(symbols(self.variables), key=lambda v: v.name)
 
     def set_parameters(self, parameters: Dict[str, float] | List[str], parameter_names: List[str]) -> None:
         """
@@ -64,10 +81,63 @@ class ODEModel(ODEModelBase):
                 variable-value pairs.
             parameter_names (List[str]): Names of the parameters in the ODE model.
         """
-        self.parameter_names = list(set(parameter_names) | self._get_parameters_names(parameters))
-        self.parameter_symbols = symbols(self.parameter_names)
+        self.parameter_names = sorted(list(set(parameter_names) | self._get_parameters_names(parameters)))
+        self.parameter_symbols = sorted(symbols(self.parameter_names), key=lambda v: v.name)
 
         self.parameters = self._initial_values(parameters, "parameters")
+
+    def set_generated_parameters(self, distribution=None):
+            """
+            Generates a single set of parameter values that satisfies the given constraints.
+            distribution: function to generate random guesses for free parameters (optional, default: log-normal distribution with mean=1, sigma=0.5).
+            """
+            if distribution is None:
+                # Default to log-normal distribution with mean=1, sigma=0.5
+                distribution = lambda: np.random.lognormal(mean=1, sigma=0.5)
+
+            solution = sympy.solve(self.constraints, self.parameter_symbols)
+
+            generated_parameters = {}
+
+            for key, value in solution.items():
+                if isinstance(value, sympy.Symbol):
+                    if value not in generated_parameters:
+                        generated_parameters[value.name] = distribution()
+                    generated_parameters[key.name] = generated_parameters[value.name]
+                else:
+                    generated_parameters[key.name] = value
+
+            for name in self.parameter_names:
+                if name not in generated_parameters:
+                    generated_parameters[name] = distribution()
+
+            self.parameters = generated_parameters
+
+    def set_generated_inputs(self, distribution=None):
+        """
+        Generates random values for dictionary entries with None values using the specified distribution.
+
+        distribution: Function to generate random values (default: log-normal distribution with mean=1, sigma=0.5).
+        """
+        if distribution is None:
+            # Default to log-normal distribution with mean=1, sigma=0.5
+            distribution = lambda: np.random.lognormal(mean=1, sigma=0.5)
+
+        for key, value in self.inputs.items():
+            if value is None:
+                # Generate a random value for None entries
+                self.inputs[key] = distribution()
+
+    def set_generated_initial_conditions(self, distribution=None):
+        if distribution is None:
+            # Default to log-normal distribution with mean=1, sigma=0.5
+            distribution = lambda: np.random.lognormal(mean=1, sigma=0.5)
+
+        for variable in self.variables:
+            if variable not in self.initial_conditions:
+                self.initial_conditions[variable] = distribution()
+            elif self.initial_conditions[variable] is None:
+                self.initial_conditions[variable] = distribution()
 
     def set_constraints(self, constraints: List[str]) -> None:
         """
@@ -77,7 +147,7 @@ class ODEModel(ODEModelBase):
             constraints (List[str]): List of constraints as strings.
         """
         # Convert each constraint string to the corresponding sympy relational expression
-        self.constraints = [self.parse_constraint(c) for c in constraints]
+        self.constraints = [self._parse_constraint(c) for c in constraints]
 
     def set_initial_conditions(self, initial_conditions: Dict[str, float] | List[str]) -> None:
         """
@@ -88,6 +158,43 @@ class ODEModel(ODEModelBase):
                 variable-value pairs.
         """
         self.initial_conditions = self._initial_values(initial_conditions, "initial conditions")
+
+    def set_inputs(self, inputs: Dict[str, float] | List[str]) -> None:
+        """
+        Set the input, either from a dictionary or a list of strings.
+
+        Args:
+            inputs (Dict[str, float] or List[str]): Inputs names as strings or as a dictionary of
+                        variable-value pairs.
+                """
+
+        if isinstance(inputs, dict):
+            self.inputs = inputs
+        elif isinstance(inputs, list):
+            self.inputs = { input_name: None for input_name in inputs }
+        else:
+            raise ValueError("Inputs must be either a dictionary or a list of strings.")
+
+        self.inputs_symbols = sorted(symbols(list(self.inputs.keys())), key=lambda v: v.name)
+
+    def set_outputs(self, outputs: List[str]) -> None:
+        """
+        Set the outputs, either from a dictionary or a list of strings.
+
+        Args:
+            outputs (List[str]): Outputs as strings.
+                """
+
+        for output in outputs:
+
+            parsed_output = sympify(output, evaluate=False,
+                                 locals={variable.name: variable for variable in
+                                         self.parameter_symbols + self.variable_symbols + self.inputs_symbols})
+
+            if not isinstance(parsed_output, Eq):
+                raise ValueError(f"Invalid output '{output}'. Must be an equation (e.g., 'x == value').")
+
+            self.outputs.append(parsed_output)
 
     @classmethod
     def _load_model_data(cls, data):
@@ -110,16 +217,19 @@ class ODEModel(ODEModelBase):
             if key not in data:
                 raise ValueError(f"Missing required key: {key}")
 
-        variables = [symbols(var) for var in data['variables']]
+        equations = data['equations']
+        variables = data['variables']
+        independent_variable = data.get('independent_variable', 't')
 
         parameters = data.get('parameters', {})
         parameters_names = data.get('parameter_names', [])
 
-        initial_conditions = data.get('initial-conditions', {})
-        equations = data['equations']
+        initial_conditions = data.get('initial_conditions', {})
         constraints = data.get('constraints', [])
+        inputs = data.get('inputs', {})
+        outputs = data.get('outputs', [])
 
-        return equations, variables, initial_conditions, parameters, parameters_names, constraints
+        return equations, variables, independent_variable, initial_conditions, parameters, parameters_names, constraints, inputs, outputs
 
     @classmethod
     def from_json(cls, file_path):
@@ -192,7 +302,7 @@ class ODEModel(ODEModelBase):
 
         return cls(*cls._load_model_data(data))
 
-    def parse_constraint(self, constraint_str: str) -> Constraint:
+    def _parse_constraint(self, constraint_str: str) -> Constraint:
         """
         Parse an equality or inequality string and return the corresponding sympy relational expression.
 
@@ -206,7 +316,8 @@ class ODEModel(ODEModelBase):
             ValueError: If the string format is invalid.
         """
         constraint = sympify(constraint_str, evaluate=False,
-                             locals= {variable.name: variable for variable in self.parameter_symbols + self.variable_symbols})
+                             locals= {variable.name: variable for variable in
+                                      [self.independent_variable] + self.parameter_symbols + self.variable_symbols})
 
         if isinstance(constraint, Constraint):
             return constraint
@@ -269,12 +380,13 @@ class ODEModel(ODEModelBase):
         # Remove whitespace from the condition string
         condition = condition.replace(' ', '')
         equation = sympify(condition,
-                           locals= {variable.name: variable for variable in self.parameter_symbols + self.variable_symbols})
+                           locals= {variable.name: variable for variable in
+                                    [self.independent_variable] + self.parameter_symbols + self.variable_symbols})
 
         if not isinstance(equation, Eq):
-            raise ValueError(f"Invalid {input_type}: '{condition}'. Must be an equation (e.g., 'x = value').")
+            raise ValueError(f"Invalid {input_type}: '{condition}'. Must be an equation (e.g., 'x == value').")
 
-            # Ensure the equation is linear and involves only one variable
+        # Ensure the equation is linear and involves only one variable
         variables = equation.free_symbols
         if len(variables) != 1:
             raise ValueError(f"Invalid {input_type}: '{condition}'. Must contain exactly one variable.")
@@ -397,45 +509,47 @@ class ODEModel(ODEModelBase):
 
         # Map variables and parameters to their corresponding values
         values: dict[str, float] = {var: val for var, val in zip(self.variables, y)}
-        values.update({param: val for param, val in self.parameters.items()})
+        values.update({param: self.parameters[param] for param in self.parameter_names})
 
         # Evaluate each equation by substituting the values into the sympy expressions
         results = [eq.subs(values).evalf() for eq in self.equations]
 
         return results
 
-    def _compute_derivatives(self, dependent_values: List[float], independent_value: float):
+    def compute_derivatives(self, t: float, y: List[float]):
         """
             Calculates the derivatives of the ODE system at a given point using the defined functions.
 
             Args:
-                dependent_values: Current values of the dependent variables in the system.
-                independent_value: The current value of the independent variable (e.g., time).
+                t: The current value of the independent variable (e.g., time).
+                y: Current values of the dependent variables in the system.
 
             Returns:
                 A list of the derivatives of the system evaluated at the given point.
         """
-
-        return [f(independent_value, *dependent_values, *self.parameters.values()) for f in self.functions]
-
-    def integrate_system(self, independent_values: List[float]):
-        """
-        Integrates the system of ODEs using a numerical integration method (odeint).
-
-        Args:
-            independent_values: A list of values of the independent variable over time.
-
-        Returns:
-            The result of integrating the system of differential equations.
-        """
+        if len(y) != len(self.variables):
+            raise ValueError("Mismatch between number of variables and input values.")
 
         if len(self.parameters) != len(self.parameter_names):
             raise ValueError("Mismatch between number of parameters and input values.")
 
-        if len(self.initial_conditions) == 0:
-            raise ValueError("Initial conditions cannot be empty.")
+        sorted_parameters = [self.parameters[param] for param in self.parameter_names]
+        sorted_inputs = [self.inputs[key] for key in sorted(self.inputs.keys())]
 
-        dependent_values = odeint(self._compute_derivatives, list(self.initial_conditions.values()), independent_values)
-        result = np.column_stack((independent_values, dependent_values))
+        return [f(t, *y, *sorted_parameters, *sorted_inputs) for f in self.functions]
 
-        return result
+    def export(self):
+
+        return {
+            "equations": [sstr(eq) for eq in self.equations],
+            "variables" : self.variables,
+            "independent_variable": self.independent_variable.name,
+            "parameters": [f"{name} == {value}" for name, value in self.parameters.items()],
+            "parameter_names": self.parameter_names,
+            "initial_conditions": [f"{name} == {value}" for name, value in self.initial_conditions.items()],
+            "constraints": [f"{sstr(constraint.lhs)} == {sstr(constraint.rhs)}" if isinstance(constraint, Eq)
+                            else sstr(constraint) for constraint in self.constraints],
+            "inputs": [f"{name} == {value}" for name, value in self.inputs.items()],
+            "outputs": [ f"{sstr(output.lhs)} == {sstr(output.rhs)}" for output in self.outputs],
+        }
+
