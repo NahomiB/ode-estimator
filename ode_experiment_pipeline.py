@@ -5,11 +5,11 @@ import uuid
 import numpy as np
 from tqdm import tqdm
 
-from src.data_generator.noise.noise_adder import NoiseAdder
-from src.data_generator.ode_integrator import ODEIntegrator
-from src.data_generator.spline_smoother import SplineSmoother
-from src.estimators.kkt_estimator import KKTLinearODEParameterEstimator
-from src.models.linear_ode_model import LinearODEModel
+from odeestimatorpy.data_generator.noise.noise_adder import NoiseAdder
+from odeestimatorpy.data_generator.ode_integrator import ODEIntegrator
+from odeestimatorpy.data_generator.spline_smoother import SplineSmoother
+from odeestimatorpy.estimators.kkt_estimator import KKTLinearODEParameterEstimator
+from odeestimatorpy.models.linear_ode_model import LinearODEModel
 
 input_file = "examples/odes_identifiable.json"
 output_dir = "output/identifiable/"

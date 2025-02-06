@@ -1,7 +1,7 @@
 from scipy.integrate import solve_ivp
 import numpy as np
 
-from src.models.ode_model_base import ODEModelBase
+from odeestimatorpy.models.ode_model_base import ODEModelBase
 
 
 class ODEIntegrator:

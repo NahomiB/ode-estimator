@@ -4,7 +4,7 @@ import numpy as np
 
 from abc import ABC, abstractmethod
 
-from src.models.ode_model_base import ODEModelBase
+from odeestimatorpy.models.ode_model_base import ODEModelBase
 
 
 class AbstractODEEstimator(ABC):

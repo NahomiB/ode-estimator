@@ -3,8 +3,8 @@ import numpy as np
 from scipy.linalg import block_diag
 from sympy import Eq, lambdify
 
-from src.estimators.estimator import AbstractODEEstimator
-from src.models.linear_ode_model import LinearODEModel
+from odeestimatorpy.estimators.estimator import AbstractODEEstimator
+from odeestimatorpy.models.linear_ode_model import LinearODEModel
 
 
 class KKTLinearODEParameterEstimator(AbstractODEEstimator):

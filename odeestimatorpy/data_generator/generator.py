@@ -4,10 +4,10 @@ from statistics import median, mode
 import numpy as np
 from numpy import mean
 
-from src.data_generator.noise.noise_adder import NoiseAdder
-from src.data_generator.ode_integrator import ODEIntegrator
-from src.data_generator.spline_smoother import LambdaOptimizer
-from src.models.linear_ode_model import LinearODEModel
+from odeestimatorpy.data_generator.noise.noise_adder import NoiseAdder
+from odeestimatorpy.data_generator.ode_integrator import ODEIntegrator
+from odeestimatorpy.data_generator.spline_smoother import LambdaOptimizer
+from odeestimatorpy.models.linear_ode_model import LinearODEModel
 
 with open("D:\School\Tesis\ode-estimator\examples\odes_identifiable.json", "r") as file:
     systems = json.load(file)

@@ -1,7 +1,7 @@
 import numpy as np
 
-from src.data_generator.noise.noise_generator import NoiseGenerator
-from src.data_generator.noise.normal_noise_generator import NormalNoiseGenerator
+from odeestimatorpy.data_generator.noise.noise_generator import NoiseGenerator
+from odeestimatorpy.data_generator.noise.normal_noise_generator import NormalNoiseGenerator
 
 
 class NoiseAdder:

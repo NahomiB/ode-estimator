@@ -12,7 +12,7 @@ from sympy.printing import sstr
 
 from typing import List, Dict, Tuple
 
-from src.models.ode_model_base import Constraint, ODEModelBase
+from odeestimatorpy.models.ode_model_base import Constraint, ODEModelBase
 
 
 class ODEModel(ODEModelBase):

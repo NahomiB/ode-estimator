@@ -2,7 +2,7 @@ from typing import List, Dict
 
 import sympy as sp
 
-from src.models.ode_model import ODEModel
+from odeestimatorpy.models.ode_model import ODEModel
 
 
 class LinearODEModel(ODEModel):
