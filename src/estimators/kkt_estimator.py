@@ -1,20 +1,19 @@
 import numpy as np
-import sympy as sp
 
 from scipy.linalg import block_diag
 from sympy import Eq, lambdify
 
-from src.estimators.estimator import AbstractODESolver
-from src.models.ode_model import ODEModel
+from src.estimators.estimator import AbstractODEEstimator
+from src.models.linear_ode_model import LinearODEModel
 
 
-class KKTLinearODEParameterEstimator(AbstractODESolver):
-    def __init__(self, model: ODEModel, ode_results: np.ndarray, solver=np.linalg.solve):
+class KKTLinearODEParameterEstimator(AbstractODEEstimator):
+    def __init__(self, model: LinearODEModel, ode_results: np.ndarray, solver=np.linalg.solve):
         """
         Initialize the solver for a linear ordinary differential equation system.
 
         Args:
-            model (ODEModel): Ordinary differential equation system to estimate parameters
+            model (LinearODEModel): Ordinary differential equation system linear in the parameters
             ode_results (numpy.ndarray): Data matrix without noise (rows: points, columns: variables)
             solver: (callable, optional): Solver to use. Defaults to np.linalg.solve
         """
@@ -25,29 +24,6 @@ class KKTLinearODEParameterEstimator(AbstractODESolver):
         self.number_of_parameters = len(model.parameter_names)
 
         self.callables_per_equation = [self._extract_callables(equation) for equation in self.model.equations]
-
-        self.check_linearity()
-
-    def _expand_and_analyze_terms(self, equation):
-        """Expand and analyze terms in a given equation."""
-        expanded_eq = sp.expand(equation)
-        for term in expanded_eq.as_ordered_terms():
-            yield term, [symbol for symbol in self.model.parameter_symbols if term.has(symbol)]
-
-    @staticmethod
-    def _verify_term_linearity(term, involved_params, equation_index):
-        """Verify if a term is linear with respect to parameters."""
-        for param in involved_params:
-            if not sp.poly(term, param).is_linear:
-                raise ValueError(f"Equation {equation_index + 1} is not linear in parameter '{param}': {term}")
-
-    def check_linearity(self):
-        """Checks if the system of equations is linear with respect to the parameters."""
-        for i, equation in enumerate(self.model.equations):
-            for term, involved_params in self._expand_and_analyze_terms(equation):
-                if len(involved_params) > 1:
-                    raise ValueError(f"Equation {i + 1} contains a nonlinear term involving multiple params: {term}")
-                self._verify_term_linearity(term, involved_params, i)
 
     def _extract_callables(self, expr):
         """
@@ -75,7 +51,8 @@ class KKTLinearODEParameterEstimator(AbstractODESolver):
             for param in self.model.parameter_symbols:
                 if param in term.free_symbols:
                     factor = term / param
-                    callables.append(lambdify(self.model.variable_symbols, factor, modules=["numpy"]))
+                    callables.append(lambdify([self.model.independent_variable] + self.model.variable_symbols,
+                                              factor, modules=["numpy"]))
                     break
 
         return callables
@@ -159,7 +136,7 @@ class KKTLinearODEParameterEstimator(AbstractODESolver):
         for constraint in self.model.constraints:
             # Ensure the constraint is an equality constraint
             if not isinstance(constraint, Eq):
-                raise ValueError(f"Constraint {constraint} is not an equality constraint of the form x = y.")
+                raise ValueError(f"Constraint {constraint} is not an equality constraint of the form x == y.")
 
             # Extract left-hand side and right-hand side
             lhs = constraint.lhs
@@ -260,8 +237,9 @@ class KKTLinearODEParameterEstimator(AbstractODESolver):
         try:
             solution = self.solver(a, b)
         except Exception as e:
-            raise ValueError(f"Error solving the system with solver {self.solver.__name__}. "
-                             f"Exception: {str(e)}") from e
+            #raise ValueError(f"Error solving the system with solver {self.solver.__name__}. "
+                            # f"Exception: {str(e)}") from e
+            return {name: str(e) for name in self.model.parameter_names}
 
         estimated_parameters = { self.model.parameter_names[i]: float(value) for i, value in enumerate(solution[:self.number_of_parameters])}
         self.model.set_parameters(estimated_parameters, [])

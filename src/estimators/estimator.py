@@ -4,11 +4,11 @@ import numpy as np
 
 from abc import ABC, abstractmethod
 
-from src.models.ode_model import ODEModel
+from src.models.ode_model_base import ODEModelBase
 
 
-class AbstractODESolver(ABC):
-    def __init__(self, model: ODEModel, ode_results: np.ndarray, solver=Callable):
+class AbstractODEEstimator(ABC):
+    def __init__(self, model: ODEModelBase, ode_results: np.ndarray, solver=Callable):
         """
         Initialize the solver for an ordinary differential equation system.
 
