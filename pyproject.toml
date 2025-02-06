@@ -21,9 +21,6 @@ license = { file = "LICENSE" }
 Homepage = "https://github.com/NahomiB/ode-estimator"
 Wiki = "https://github.com/NahomiB/ode-estimator/wiki"
 
-[tool.setuptools]
-packages = ["odeestimatorpy"]
-
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["odeestimatorpy*"]
