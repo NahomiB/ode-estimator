@@ -59,9 +59,6 @@ class SplineCrossValidator:
         """
         kf = KFold(n_splits=self.k, shuffle=True, random_state=42)
 
-        if len(self.independent_values)<500:
-            print(len(self.independent_values))
-
         with ThreadPoolExecutor() as executor:
             result = [ executor.submit(self._validate_fold, train_index, val_index, s) for train_index, val_index in kf.split(self.independent_values)]
 

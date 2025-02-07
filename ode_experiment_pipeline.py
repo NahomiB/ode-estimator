@@ -34,7 +34,7 @@ def process_single_system(system):
     save_json(model_dict, f"{output_dir}models.json")
 
     # Generate data from the model
-    data = ODEIntegrator(model, [0, 100]).integrate(num_points=500)
+    data = ODEIntegrator(model, [0, 100]).integrate(num_points=100)
     x = data["x"]
     y = data["y"]
 
