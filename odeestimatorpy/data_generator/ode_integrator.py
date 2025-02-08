@@ -61,6 +61,8 @@ class ODEIntegrator:
                     raise ValueError(
                         f"Values in t_eval must be within the range defined by t_span {self.t_span}."
                     )
+            else:
+                self.t_span = (t_eval[0], t_eval[-1])
 
         # Perform the integration
         result = solve_ivp(

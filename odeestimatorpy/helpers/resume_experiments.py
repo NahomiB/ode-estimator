@@ -10,11 +10,10 @@ from odeestimatorpy.data_generator.ode_integrator import ODEIntegrator
 from odeestimatorpy.data_generator.spline_cross_validator import SplineCrossValidator
 from odeestimatorpy.data_generator.spline_smoother import SplineSmoother
 from odeestimatorpy.estimators.kkt_estimator import KKTLinearODEParameterEstimator
-from odeestimatorpy.experiments.kkt_experiment_pipeline import define_system
-from odeestimatorpy.helpers.json import save_new_json
+from odeestimatorpy.helpers.collect_models import load_existing_models
+from odeestimatorpy.helpers.save_to_json import save_new_json
 from odeestimatorpy.models.linear_ode_model import LinearODEModel
 
-input_file = "../../examples/odes_identifiable.json"
 output_dir = "../../output/identifiable/"
 models_file = f"{output_dir}models.json"
 
@@ -93,15 +92,6 @@ def find_best_s(x, y):
     s, _ = SplineCrossValidator.get_best_s(means)
     return s
 
-
-def load_existing_models():
-    """Load models.json and return a dictionary mapping model details to their assigned ID."""
-    try:
-        with open(models_file, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
-
 def match_model_dict(one, another):
 
     one_equations = one["equations"]
@@ -132,32 +122,19 @@ def single(model, existing_models):
 
 def resume_unfinished_experiments():
     """Find and resume unfinished experiments."""
-    with open(input_file, "r") as f:
-        ode_systems = json.load(f)
-
-    existing_models = load_existing_models()
-    count = len(existing_models)
+    ode_systems = load_existing_models(output_dir)
 
     unfinished_experiments = []
 
     for system in ode_systems:
 
-        existing_model = single(system, existing_models)
-
-        if existing_model is None:
-
-            model, system_dir = define_system(count, system)
-            count += 1
-
-            unfinished_experiments.append((system_dir, model, required_files))
-
-        system_dir = os.path.join(output_dir, existing_model["ID"])
+        system_dir = os.path.join(output_dir, system["ID"])
 
         if os.path.isdir(system_dir):
             existing_files = set(os.listdir(system_dir))
             missing_steps = [f for f in required_files if f not in existing_files]
             if missing_steps:
-                unfinished_experiments.append((system_dir, existing_model, missing_steps))
+                unfinished_experiments.append((system_dir, system, missing_steps))
 
     if not unfinished_experiments:
         print("No unfinished experiments found.")

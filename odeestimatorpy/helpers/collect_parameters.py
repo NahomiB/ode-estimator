@@ -1,9 +1,9 @@
 # Base directory to search for files
 import json
 import os
-from typing import re
+import re
 
-BASE_DIR = "D:\School\Tesis\ode-estimator\output\identifiable"
+BASE_DIR = "..\..\output\identifiable"
 
 # Regex pattern to match the required filenames
 FILENAME_PATTERN = re.compile(r"parameter_estimations_(5|10|15)\.json")

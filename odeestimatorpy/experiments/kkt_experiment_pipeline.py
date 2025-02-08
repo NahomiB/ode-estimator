@@ -11,7 +11,7 @@ from odeestimatorpy.data_generator.ode_integrator import ODEIntegrator
 from odeestimatorpy.data_generator.spline_cross_validator import SplineCrossValidator
 from odeestimatorpy.data_generator.spline_smoother import SplineSmoother
 from odeestimatorpy.estimators.kkt_estimator import KKTLinearODEParameterEstimator
-from odeestimatorpy.helpers.json import save_json, save_new_json
+from odeestimatorpy.helpers.save_to_json import save_json, save_new_json
 from odeestimatorpy.models.linear_ode_model import LinearODEModel
 
 input_file = "../../examples/odes_identifiable.json"
@@ -25,7 +25,7 @@ def process_single_system(system, system_dir):
     model = LinearODEModel.from_dict(system)
 
     # Generate data from the model
-    data = ODEIntegrator(model, [0, 100]).integrate(num_points=100)
+    data = ODEIntegrator(model, [0, 100]).integrate(num_points=200)
     x = data["x"]
     y = data["y"]
 
