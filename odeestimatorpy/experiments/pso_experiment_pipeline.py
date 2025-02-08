@@ -48,6 +48,10 @@ def process_single_system(system: dict):
     return system["ID"]
 
 def process(model: LinearODEModel, system_dir: str, file: str):
+    param_file = f"{system_dir}/pso_parameters_{file}"
+
+    if os.path.exists(param_file):
+        return
 
     try:
         with open(os.path.join(system_dir, file), "r") as f:
@@ -63,13 +67,11 @@ def process(model: LinearODEModel, system_dir: str, file: str):
         return
 
     try:
-
         smoothed_data = np.array(smoothed_data)
 
         estimator = PSOEstimator(model,  np.column_stack((x, smoothed_data.T)))
         estimated_params = estimator.solve()
 
-        param_file = f"{system_dir}/pso_parameters_{file}"
         save_new_json({"parameters": estimated_params}, param_file)
 
     except Exception:
