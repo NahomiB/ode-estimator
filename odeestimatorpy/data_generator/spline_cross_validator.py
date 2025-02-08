@@ -45,7 +45,10 @@ class SplineCrossValidator:
             spline = make_splrep(x_train, y_train[i, :], s=s)
             y_pred[i, :] = splev(x_val, spline)
 
-        return np.sqrt(mean_squared_error(y_val, y_pred))
+        residuals = y_val - y_pred
+        validation_score = np.linalg.norm(residuals, ord=2)
+
+        return validation_score
 
     def _cross_validate_for_s(self, s):
         """
@@ -81,15 +84,15 @@ class SplineCrossValidator:
         return {s: future.result() for s, future in result.items()}
 
     @staticmethod
-    def get_best_s(means):
+    def get_best_s(norms):
         """
         Find the best smoothing value based on the lowest mean error.
 
         Args:
-            means (Dict[float, float]): Dictionary mapping each smoothing value to its mean error.
+            norms (Dict[float, float]): Dictionary mapping each smoothing value to its norm-2 value.
 
         Returns:
-            Tuple[float, float]: The best smoothing value and its corresponding error.
+            Tuple[float, float]: The best smoothing value and its corresponding norm-2.
         """
-        best = min(means, key=means.get)
-        return best, means[best]
+        best = min(norms, key=norms.get)
+        return best, norms[best]

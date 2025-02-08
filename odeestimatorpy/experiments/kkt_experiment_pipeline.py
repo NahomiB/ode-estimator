@@ -94,7 +94,6 @@ def process_noise_level(system_dir, x, y, noise_level, model):
         print(f"Error capturado:\n{error_trace}")
 
 
-
 def find_best_s(x, y, s_values=None):
     """Performs cross-validation to determine the best 's' value for smoothing."""
     if s_values is None:
@@ -105,22 +104,6 @@ def find_best_s(x, y, s_values=None):
     s, mean = SplineCrossValidator.get_best_s(means)
 
     return s
-
-def validate_s(s, x, y, kf):
-    """Compute validation error for a given s."""
-    errors = []
-
-    for train_idx, test_idx in kf.split(x):
-        x_train, x_test = x[train_idx], x[test_idx]
-        y_train, y_test = y[:, train_idx], y[:, test_idx]
-
-        smoother = SplineSmoother(s_value=s)
-        y_pred = smoother.smooth(x_train, y_train)
-
-        error = np.mean((y_pred - y_test) ** 2)  # Mean Squared Error
-        errors.append(error)
-
-    return s, np.mean(errors)
 
 def process_wrapper(args):
     return process_single_system(*args)
