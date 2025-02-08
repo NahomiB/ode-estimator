@@ -1,5 +1,6 @@
 import json
 import multiprocessing
+import os
 
 lock = multiprocessing.Lock()
 
@@ -20,5 +21,8 @@ def save_json(data, file_path):
 
 def save_new_json(data, file_path):
     """Save JSON data to a new file."""
+
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
     with open(file_path, "w") as f:
         json.dump(data, f, indent=2)
