@@ -18,7 +18,9 @@ class KKTLinearODEParameterEstimator(AbstractODEEstimator):
             solver: (callable, optional): Solver to use. Defaults to np.linalg.solve
         """
 
-        super().__init__(model, ode_results, solver)
+        super().__init__(model, ode_results)
+
+        self.solver = solver
 
         self.number_of_constraints = len(model.constraints)
         self.number_of_parameters = len(model.parameter_names)

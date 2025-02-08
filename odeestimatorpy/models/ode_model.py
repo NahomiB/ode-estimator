@@ -377,23 +377,28 @@ class ODEModel(ODEModelBase):
         Raises:
             ValueError: If the string is not in the expected format, or if the equality cannot be parsed.
         """
+
         # Remove whitespace from the condition string
         condition = condition.replace(' ', '')
-        equation = sympify(condition,
-                           locals= {variable.name: variable for variable in
-                                    [self.independent_variable] + self.parameter_symbols + self.variable_symbols})
 
-        if not isinstance(equation, Eq):
-            raise ValueError(f"Invalid {input_type}: '{condition}'. Must be an equation (e.g., 'x == value').")
+        if "=" not in condition:
+            raise ValueError(f"Invalid format: '{condition}'. Expected '=' in the equation.")
 
-        # Ensure the equation is linear and involves only one variable
-        variables = equation.free_symbols
+        left_side, right_side = condition.split("=")
+
+        expr_locals = {variable.name: variable for variable in
+                                    [self.independent_variable] + self.parameter_symbols + self.variable_symbols}
+
+        left_expr = sympify(left_side,locals= expr_locals)
+        right_expr = sympify(right_side, locals= expr_locals)
+
+        variables = left_expr.free_symbols.union(right_expr.free_symbols)
+
         if len(variables) != 1:
-            raise ValueError(f"Invalid {input_type}: '{condition}'. Must contain exactly one variable.")
+            raise ValueError(f"Invalid equation: '{condition}'. Must contain exactly one variable.")
 
-        # Solve for the variable
-        variable = next(iter(variables))  # Extract the single variable
-        solution = solve(equation, variable)
+        variable = next(iter(variables))  # Extract variable
+        solution = solve(Eq(left_expr, right_expr), variable)
 
         if len(solution) != 1:
             raise ValueError(f"Invalid {input_type}: '{condition}'. Must have a unique solution.")
@@ -544,12 +549,12 @@ class ODEModel(ODEModelBase):
             "equations": [sstr(eq) for eq in self.equations],
             "variables" : self.variables,
             "independent_variable": self.independent_variable.name,
-            "parameters": [f"{name} == {value}" for name, value in self.parameters.items()],
+            "parameters": [f"{name} = {value}" for name, value in self.parameters.items()],
             "parameter_names": self.parameter_names,
-            "initial_conditions": [f"{name} == {value}" for name, value in self.initial_conditions.items()],
+            "initial_conditions": [f"{name} = {value}" for name, value in self.initial_conditions.items()],
             "constraints": [f"{sstr(constraint.lhs)} == {sstr(constraint.rhs)}" if isinstance(constraint, Eq)
                             else sstr(constraint) for constraint in self.constraints],
-            "inputs": [f"{name} == {value}" for name, value in self.inputs.items()],
+            "inputs": self.inputs,
             "outputs": [ f"{sstr(output.lhs)} == {sstr(output.rhs)}" for output in self.outputs],
         }
 

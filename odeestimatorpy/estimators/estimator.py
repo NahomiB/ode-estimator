@@ -8,31 +8,19 @@ from odeestimatorpy.models.ode_model_base import ODEModelBase
 
 
 class AbstractODEEstimator(ABC):
-    def __init__(self, model: ODEModelBase, ode_results: np.ndarray, solver=Callable):
+    def __init__(self, model: ODEModelBase, ode_results: np.ndarray):
         """
         Initialize the solver for an ordinary differential equation system.
 
         Args:
             model (ODEModel): Ordinary differential equation system to estimate parameters
             ode_results (numpy.ndarray): Data matrix (rows: points, columns: variables)
-            solver: (callable): Solver to use.
         """
 
         self.model = model
         self.ode_results = ode_results
-        self.solver = solver
 
     @abstractmethod
     def solve(self):
         """Solve the ODE system and estimate parameters."""
-        pass
-
-    @abstractmethod
-    def _build_system_matrix(self, normal_matrices, r_vectors, c_vectors):
-        """Build the full system matrix."""
-        pass
-
-    @abstractmethod
-    def _build_rhs_vector(self, size):
-        """Construct the right-hand side vector for the system."""
         pass

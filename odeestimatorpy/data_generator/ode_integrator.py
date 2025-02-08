@@ -32,13 +32,12 @@ class ODEIntegrator:
         self.method = method
         self.solution = None
 
-    def integrate(self, t_eval=None, independent_variable_name="time", num_points=100):
+    def integrate(self, t_eval=None, num_points=100):
         """
         Perform the integration of the ODE system with a customizable independent variable.
 
         Parameters:
             t_eval (array-like, optional): Specific points at which to evaluate the solution. If None, defaults to np.linspace over t_span.
-            independent_variable_name (str): Name of the independent variable (e.g., "time", "space").
             num_points (int, optional): Number of points to evaluate the integration over.
 
         Returns:
