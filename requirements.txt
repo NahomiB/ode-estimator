@@ -7,3 +7,4 @@ tqdm~=4.67.1
 seaborn~=0.13.2
 odeestimatorpy~=2025.0.5
 scikit-learn~=1.6.1
+pyswarms~=1.3.0
