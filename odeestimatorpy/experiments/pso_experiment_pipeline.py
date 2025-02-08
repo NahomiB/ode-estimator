@@ -2,15 +2,18 @@ import concurrent.futures
 import json
 import os
 import re
+import traceback
+
+import numpy as np
 
 from tqdm import tqdm
 
 from odeestimatorpy.estimators.pso_estimator import PSOEstimator
-from odeestimatorpy.helpers.json import save_new_json
+from odeestimatorpy.helpers.collect_models import load_existing_models
+from odeestimatorpy.helpers.save_to_json import save_new_json
 from odeestimatorpy.models.linear_ode_model import LinearODEModel
 
-OUTPUT_DIR = "D:\School\Tesis\ode-estimator\output\globally"
-INPUT_FILE = f"{OUTPUT_DIR}\models.json"
+OUTPUT_DIR = r"..\..\output\identifiable"
 SMOOTH_DATA_PATTERN = re.compile(r"smoothed_data_(5|10|15)\.json")
 
 def process_single_system(system: dict):
@@ -21,8 +24,18 @@ def process_single_system(system: dict):
 
     system_dir = os.path.join(OUTPUT_DIR, system["ID"])
 
-    model_dict = apply_constraints(system)
-    model = LinearODEModel.from_dict(model_dict)
+    unconstrained_path = os.path.join(system_dir, "unconstrained.json")
+
+    if not os.path.exists(unconstrained_path):
+        model_dict = apply_constraints(system)
+        model = LinearODEModel.from_dict(model_dict)
+
+        save_new_json(model.export(), unconstrained_path)
+    else:
+        with open(unconstrained_path, "r") as f:
+            model_dict = json.load(f)
+        model = LinearODEModel.from_dict(model_dict)
+
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = {
@@ -39,17 +52,30 @@ def process(model: LinearODEModel, system_dir: str, file: str):
     try:
         with open(os.path.join(system_dir, file), "r") as f:
             smoothed_data = json.load(f)["data"]
+
+        with (open(os.path.join(system_dir, "data.json"), "r")) as f:
+            x = json.load(f)["x"]
+
     except FileNotFoundError:
         smoothed_data = None
 
-    if smoothed_data is None:
+    if smoothed_data is None or x is None:
         return
 
-    estimator = PSOEstimator(model, smoothed_data)
-    estimated_params = estimator.solve()
+    try:
 
-    param_file = f"{system_dir}/pso_parameters_{file}.json"
-    save_new_json({"parameters": estimated_params}, param_file)
+        smoothed_data = np.array(smoothed_data)
+
+        estimator = PSOEstimator(model,  np.column_stack((x, smoothed_data.T)))
+        estimated_params = estimator.solve()
+
+        param_file = f"{system_dir}/pso_parameters_{file}"
+        save_new_json({"parameters": estimated_params}, param_file)
+
+    except Exception:
+        traceback.print_exc()
+        print("hi")
+
 
 
 def apply_constraints(system_data):
@@ -88,8 +114,8 @@ def apply_constraints(system_data):
 
 def process_ode_systems(batch_size=100):
     """Process ODE systems in batches using multiprocessing for parallelism."""
-    with open(INPUT_FILE, "r") as f:
-        ode_systems = json.load(f)
+
+    ode_systems = load_existing_models(OUTPUT_DIR)
 
     total_systems = len(ode_systems)
     print(f"Total systems to process: {total_systems}")
