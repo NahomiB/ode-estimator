@@ -145,14 +145,14 @@ class KKTLinearODEParameterEstimator(AbstractODEEstimator):
             rhs = constraint.rhs
 
             # Extract coefficient and symbol for lhs
-            if isinstance(lhs, Mul) and len(lhs.args) == 2 and isinstance(lhs.args[0], (int, float)):
-                lhs_coefficient, lhs_symbol = lhs.args
+            if isinstance(lhs, Mul) and len(lhs.args) == 2 and lhs.args[0].is_Number:
+                lhs_coefficient, lhs_symbol = lhs.args[0].evalf(), lhs.args[1]
             else:
                 lhs_coefficient, lhs_symbol = 1, lhs
 
             # Extract coefficient and symbol for rhs
-            if isinstance(rhs, Mul) and len(rhs.args) == 2 and isinstance(rhs.args[0], (int, float)):
-                rhs_coefficient, rhs_symbol = rhs.args
+            if isinstance(rhs, Mul) and len(rhs.args) == 2 and rhs.args[0].is_Number:
+                rhs_coefficient, rhs_symbol = rhs.args[0].evalf(), rhs.args[1]
             else:
                 rhs_coefficient, rhs_symbol = 1, rhs
 
