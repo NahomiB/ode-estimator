@@ -1,7 +1,7 @@
 import numpy as np
 
 from scipy.linalg import block_diag
-from sympy import Eq, lambdify
+from sympy import Eq, lambdify, Mul
 
 from odeestimatorpy.estimators.estimator import AbstractODEEstimator
 from odeestimatorpy.models.linear_ode_model import LinearODEModel
@@ -138,24 +138,36 @@ class KKTLinearODEParameterEstimator(AbstractODEEstimator):
         for constraint in self.model.constraints:
             # Ensure the constraint is an equality constraint
             if not isinstance(constraint, Eq):
-                raise ValueError(f"Constraint {constraint} is not an equality constraint of the form x == y.")
+                raise ValueError(f"Constraint {constraint} is not an equality constraint of the form ax == by.")
 
             # Extract left-hand side and right-hand side
             lhs = constraint.lhs
             rhs = constraint.rhs
 
+            # Extract coefficient and symbol for lhs
+            if isinstance(lhs, Mul) and len(lhs.args) == 2 and isinstance(lhs.args[0], (int, float)):
+                lhs_coefficient, lhs_symbol = lhs.args
+            else:
+                lhs_coefficient, lhs_symbol = 1, lhs
+
+            # Extract coefficient and symbol for rhs
+            if isinstance(rhs, Mul) and len(rhs.args) == 2 and isinstance(rhs.args[0], (int, float)):
+                rhs_coefficient, rhs_symbol = rhs.args
+            else:
+                rhs_coefficient, rhs_symbol = 1, rhs
+
             # Ensure both lhs and rhs are valid parameters
-            if lhs.name not in self.model.parameter_names or rhs.name not in self.model.parameter_names:
+            if lhs_symbol.name not in self.model.parameter_names or rhs_symbol.name not in self.model.parameter_names:
                 raise ValueError(f"Both sides of the constraint {constraint} must be valid parameter names.")
 
             # Get the indices of the parameters
-            i = self.model.parameter_names.index(lhs.name)
-            j = self.model.parameter_names.index(rhs.name)
+            i = self.model.parameter_names.index(lhs_symbol.name)
+            j = self.model.parameter_names.index(rhs_symbol.name)
 
             # Build rij and cij vectors
             ri = np.zeros(self.number_of_parameters)
-            ri[i] = 1
-            ri[j] = -1
+            ri[i] = lhs_coefficient
+            ri[j] = -rhs_coefficient
 
             r_vectors[(i, j)] = ri
             c_vectors[(i, j)] = ri.T
