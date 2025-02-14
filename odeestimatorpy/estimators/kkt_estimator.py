@@ -182,8 +182,11 @@ class KKTLinearODEParameterEstimator(AbstractODEEstimator):
                 raise ValueError(f"Both sides of the constraint {constraint} must be valid parameter names.")
 
             # Get the indices of the parameters
-            i = self.model.parameter_names.index(lhs_symbol.name)
-            j = self.model.parameter_names.index(rhs_symbol.name)
+            i = self.index_by_parameter.get(lhs_symbol.name, -1)
+            j = self.index_by_parameter.get(rhs_symbol.name, -1)
+
+            if i == -1 or j == -1:
+                ValueError(f"Parameter in constraint {constraint} is not used in equations")
 
             # Build rij and cij vectors
             ri = np.zeros(self.number_of_parameters)
