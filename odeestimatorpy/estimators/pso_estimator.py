@@ -3,7 +3,6 @@ import pyswarms as ps
 
 from odeestimatorpy.data_generator.ode_integrator import ODEIntegrator
 from odeestimatorpy.estimators.estimator import AbstractODEEstimator
-from odeestimatorpy.helpers.multiprocess import get_n_process
 
 
 class PSOEstimator(AbstractODEEstimator):
@@ -83,7 +82,7 @@ class PSOEstimator(AbstractODEEstimator):
         no_improve_count = 0  # Counter for stagnation
 
         for i in range(self.iters):
-            best_cost, best_params = optimizer.optimize(self.cost_function, iters=1, verbose=False)
+            best_cost, best_params = optimizer.optimize(self.cost_function, iters=1, verbose=True)
             best_cost_history.append(best_cost)
 
             # Check for early stopping

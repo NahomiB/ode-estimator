@@ -1,0 +1,317 @@
+[
+    {
+        "equations": [
+            "-a1*S*I",
+            "a2*I",
+            "a3*S*I - a4*I"
+        ],
+        "variables": [
+            "S",
+            "I",
+            "R"
+        ],
+        "parameter_names": [
+            "a1",
+            "a2",
+            "a3",
+            "a4"
+        ],
+        "constraints": [
+            "a2 == a4",
+            "a1 == a3"
+        ],
+        "ID": "SIR"
+    },
+    {
+        "equations": [
+            "a1*N - a2*S - a3*S*I - a4*S",
+            "a5*S*I - a6*E - a7*E",
+            "a8*E - a9*I - a10*I - a11*I",
+            "a12*I - a13*R + a14*S",
+            "a15*N - a16*N - a17*I"
+        ],
+        "variables": [
+            "N",
+            "S",
+            "E",
+            "I",
+            "R"
+        ],
+        "parameter_names": [
+            "a1",
+            "a2",
+            "a3",
+            "a4",
+            "a5",
+            "a6",
+            "a7",
+            "a8",
+            "a9",
+            "a10",
+            "a11",
+            "a12",
+            "a13",
+            "a14",
+            "a15",
+            "a16",
+            "a17"
+        ],
+        "constraints": [
+            "a2 == a7",
+            "a2 == a11",
+            "a2 == a16",
+            "a3 == a5",
+            "a4 == a14",
+            "a6 == a8",
+            "a9 == a12",
+            "a10 == a17",
+            "a13 == a15"
+        ],
+        "ID": "SEIR"
+    },
+    {
+        "equations": [
+            "-a1*S*I",
+            "a2*S*I"
+        ],
+        "variables": [
+            "S",
+            "I"
+        ],
+        "parameter_names": [
+            "a1",
+            "a2"
+        ],
+        "constraints": [
+            "a1 == a2"
+        ],
+        "ID": "SI"
+    },
+    {
+        "equations": [
+            "a1*(1 - S) - a2*S*I",
+            "a3*S*I - a4*I - a5*I",
+            "a6*I - a7*R"
+        ],
+        "variables": [
+            "S",
+            "I",
+            "R"
+        ],
+        "parameter_names": [
+            "a1",
+            "a2",
+            "a3",
+            "a4",
+            "a5",
+            "a6",
+            "a7"
+        ],
+        "constraints": [
+            "a1 == a5",
+            "a1 == a7",
+            "a2 == a3",
+            "a4 == a6"
+        ],
+        "ID": "SIR-BD"
+    },
+    {
+        "equations": [
+            "a1*I - a2*S*I",
+            "a3*S*I - a4*I"
+        ],
+        "variables": [
+            "S",
+            "I"
+        ],
+        "parameter_names": [
+            "a1",
+            "a2",
+            "a3",
+            "a4"
+        ],
+        "constraints": [
+            "a1 == a4",
+            "a2 == a3"
+        ],
+        "ID": "SIS"
+    },
+    {
+        "equations": [
+            "a1*(1 - S) + a2*R - a3*S*I",
+            "a4*S*I - a5*I - a6*I",
+            "a7*I - a8*R - a9*R"
+        ],
+        "variables": [
+            "S",
+            "I",
+            "R"
+        ],
+        "parameter_names": [
+            "a1",
+            "a2",
+            "a3",
+            "a4",
+            "a5",
+            "a6",
+            "a7",
+            "a8",
+            "a9"
+        ],
+        "constraints": [
+            "a1 == a6",
+            "a1 == a9",
+            "a2 == a8",
+            "a3 == a4",
+            "a5 == a7"
+        ],
+        "ID": "SIRS"
+    },
+    {
+        "equations": [
+            "a1 -a2*M - a3*M",
+            "a4*M - a5*S*I - a6*S",
+            "a6*S*I - a5*I - a6*I",
+            "a7*I - a8*R"
+        ],
+        "variables": [
+            "S",
+            "I",
+            "R",
+            "M"
+        ],
+        "parameter_names": [
+            "a1",
+            "a2",
+            "a3",
+            "a4",
+            "a5",
+            "a6",
+            "a7",
+            "a8",
+            "a9",
+            "a10",
+            "a11"
+        ],
+        "constraints": [
+            "a2 == a4",
+            "a3 == a6",
+            "a5 == a7",
+            "a2 == a8",
+            "a2 == a8",
+            "a2 == a10",
+            "a3 == a9",
+            "a3 == a11"
+        ],
+        "ID": "MSIR"
+    },
+    {
+        "equations": [
+            "-a1*S*I + a2*S",
+            "a3*S*I - a4*I - a5*I",
+            "a6*I",
+            "-a7*S",
+            "a8*I"
+        ],
+        "variables": [
+            "S",
+            "I",
+            "R",
+            "V",
+            "D"
+        ],
+        "parameter_names": [
+            "a1",
+            "a2",
+            "a3",
+            "a4",
+            "a5",
+            "a6",
+            "a7",
+            "a8"
+        ],
+        "constraints": [
+            "a1 == a3",
+            "a2 == a7",
+            "a4 == a6",
+            "a5 == a8"
+        ],
+        "ID": "SIRVD"
+    },
+    {
+        "equations": [
+            "a1 -a2*S*I - a3*S + a4*I",
+            "a5*S*I - a6*E + a7*E",
+            "a8*E - a9*I - a10*I"
+        ],
+        "variables": [
+            "S",
+            "E",
+            "I"
+        ],
+        "parameter_names": [
+            "a1",
+            "a2",
+            "a3",
+            "a4",
+            "a5",
+            "a6",
+            "a7",
+            "a8",
+            "a9",
+            "a10"
+        ],
+        "constraints": [
+            "a2 == a5",
+            "a3 == a7",
+            "a3 == a10",
+            "a4 == a9",
+            "a6 == a8"
+        ],
+        "ID": "SEIS"
+    },
+    {
+        "equations": [
+            "a1 - a2*M - a3*M",
+            "a4*M - a5*S*I - a6*S",
+            "a7*S*I - a8*E - a9*E",
+            "a10*E - a11*I - a12*I",
+            "a13*I - a14*M"
+        ],
+        "variables": [
+            "S",
+            "I",
+            "R",
+            "M",
+            "E"
+        ],
+        "parameter_names": [
+            "a1",
+            "a2",
+            "a3",
+            "a4",
+            "a5",
+            "a6",
+            "a7",
+            "a8",
+            "a9",
+            "a10",
+            "a11",
+            "a12",
+            "a13",
+            "a14"
+        ],
+        "constraints": [
+            "a2 == a4",
+            "a3 == a6",
+            "a3 == a9",
+            "a3 == a12",
+            "a3 == a14",
+            "a5 == a7",
+            "a8 == a10",
+            "a2 == a11",
+            "a2 == a13"
+        ],
+        "ID": "MSEIR"
+    }
+]

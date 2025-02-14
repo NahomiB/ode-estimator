@@ -25,6 +25,9 @@ class KKTLinearODEParameterEstimator(AbstractODEEstimator):
         self.number_of_constraints = len(model.constraints)
         self.number_of_parameters = len(model.parameter_names)
 
+        self.index_by_parameter = {}
+        self.independent_terms_by_equation = []
+
         self.callables_per_equation = [self._extract_callables(equation) for equation in self.model.equations]
 
     def _extract_callables(self, expr):
@@ -47,6 +50,8 @@ class KKTLinearODEParameterEstimator(AbstractODEEstimator):
         # List to store the callables
         callables = []
 
+        independent_terms = []
+
         # Iterate over the terms
         for term in terms:
             # Check if the term contains a parameter
@@ -55,12 +60,23 @@ class KKTLinearODEParameterEstimator(AbstractODEEstimator):
                     factor = term / param
                     callables.append(lambdify([self.model.independent_variable] + self.model.variable_symbols,
                                               factor, modules=["numpy"]))
+                    if param in self.index_by_parameter:
+                        raise ValueError(f"Parameter {param} already used in another equation")
+                    self.index_by_parameter[param] = len(self.index_by_parameter)
                     break
+            else:
+                # If no parameter is found, store it as an independent term
+                independent_terms.append(term)
+
+        # Store independent terms as a sum for later evaluation
+        self.independent_terms_by_equation.append(lambda *args: 0 if len(independent_terms) == 0 else
+                lambdify([self.model.independent_variable] + self.model.variable_symbols + self.model.inputs_symbols,
+                         sum(independent_terms), modules=["numpy"]))
 
         return callables
 
     @staticmethod
-    def _compute_weighted_derivative(col, f, data):
+    def _compute_weighted_derivative(col, f, h, input_values, data):
         """
         Computes a weighted sum of function values evaluated over a dataset D
         where the weights are derived from the finite differences of the dataset.
@@ -68,14 +84,19 @@ class KKTLinearODEParameterEstimator(AbstractODEEstimator):
         Args:
             col (int): The column index used to compute the finite differences (slope).
             f (callable): The function to evaluate.
+            h (callable): The independent terms.
+            input_values(list): The values for the model inputs
             data (ndarray): Dataset of tuples, each containing values corresponding to the columns.
 
         Returns:
             float: The weighted sum of function values.
         """
         slopes = np.diff(data[:, col]) / np.diff(data[:, 0])
+        h_values = np.array([h(*row, *input_values) for row in data[:-1]])
+        adjusted_slopes = slopes - h_values
+
         f_values = np.array([f(*row) for row in data[:-1]])
-        return np.sum(f_values * slopes)
+        return np.sum(f_values * adjusted_slopes)
 
     @staticmethod
     def _scalar_product(f, g, data):
