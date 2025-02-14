@@ -1,39 +1,58 @@
 import json
 import os
-import shutil
 from glob import glob
+import re
 
 
 def load_existing_models(output_dir):
+    ode_systems = []
+    pattern = re.compile(r"models_(\d+)\.json")
 
-    models = []
-    for file in sorted(glob(os.path.join(output_dir, "models_*.json"))):
-        with open(file, "r") as f:
-            models.extend(json.load(f))
+    for file in sorted(glob(os.path.join(output_dir, "**", "models_*.json"), recursive=True)):
+        match = pattern.search(file)
+        if match:
+            with open(file, "r") as f:
+                model_list = json.load(f)
+                for model in model_list:
+                    model["directory"] = os.path.join(os.path.dirname(file), model["ID"])
+                ode_systems.extend(model_list)
 
-    return models
+    return ode_systems
 
-SOURCE_DIR = "D:\School\Tesis\ode-estimator\output\identifiable"
-OUTPUT_DIR = "..\..\output\identifiable-by-page"
 
-def copy_to_page_folder():
+def load_models_in_batches(path_dict, batch_size=100):
+    # Load all models from the JSON files
+    all_models = {name: load_json_list(path) for name, path in path_dict.items()}
 
-    for file in sorted(glob(os.path.join(SOURCE_DIR, "models_*.json"))):
-        with open(file, "r") as f:
-            data = json.load(f)
-            ids = {str(item["ID"]) for item in data}
+    # Initialize index counters for each model
+    indices = {name: 0 for name in all_models.keys()}
 
-        number = file.split("_")[1].split(".")[0]
+    while any(indices):
+        batch = {}
 
-        number_folder = os.path.join(OUTPUT_DIR, number)
-        os.makedirs(number_folder, exist_ok=True)
+        for name in list(indices.keys()):  # Iterate over a copy of the keys
+            start = indices[name]
+            end = min(start + batch_size, len(all_models[name]))
 
-        for folder_name in os.listdir(SOURCE_DIR):
-            folder_path = os.path.join(SOURCE_DIR, folder_name)
-            if os.path.isdir(folder_path) and folder_name in ids:
-                destination_folder = os.path.join(number_folder, folder_name)
-                shutil.copytree(folder_path, destination_folder, dirs_exist_ok=True)
+            if start < len(all_models[name]):  # Only add if there are remaining elements
+                batch[name] = all_models[name][start:end]
+                indices[name] = end  # Update the index
 
-    print(os.path.join(SOURCE_DIR, "models_*.json"))
+            # Remove from indices if the model is fully processed
+            if indices[name] >= len(all_models[name]):
+                del indices[name]
 
-    print(len(glob(os.path.join(SOURCE_DIR, "models_*.json"))))
+        if batch:  # Only yield non-empty batches
+            yield batch
+
+
+def load_json_list(path):
+    """ Loads a JSON file containing a list of models """
+    try:
+        with open(path, 'r', encoding='utf-8') as file:
+            return json.load(file)  # Assumes the JSON contains a list
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error loading {path}: {e}")
+        return []
+
+

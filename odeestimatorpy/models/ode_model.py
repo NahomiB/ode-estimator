@@ -93,7 +93,7 @@ class ODEModel(ODEModelBase):
             """
             if distribution is None:
                 # Default to log-normal distribution with mean=1, sigma=0.5
-                distribution = lambda: np.random.lognormal(mean=1, sigma=0.5)
+                distribution = lambda: np.random.uniform()
 
             solution = sympy.solve(self.constraints, self.parameter_symbols)
 
@@ -120,8 +120,8 @@ class ODEModel(ODEModelBase):
         distribution: Function to generate random values (default: log-normal distribution with mean=1, sigma=0.5).
         """
         if distribution is None:
-            # Default to log-normal distribution with mean=1, sigma=0.5
-            distribution = lambda: np.random.lognormal(mean=1, sigma=0.5)
+            # Default to normal distribution with mean=0
+            distribution = lambda: np.random.uniform()
 
         for key, value in self.inputs.items():
             if value is None:
@@ -130,8 +130,8 @@ class ODEModel(ODEModelBase):
 
     def set_generated_initial_conditions(self, distribution=None):
         if distribution is None:
-            # Default to log-normal distribution with mean=1, sigma=0.5
-            distribution = lambda: np.random.lognormal(mean=1, sigma=0.5)
+            # Default to normal distribution with mean=0
+            distribution = lambda: np.random.uniform()
 
         for variable in self.variables:
             if variable not in self.initial_conditions:
@@ -353,13 +353,15 @@ class ODEModel(ODEModelBase):
         if isinstance(input_values, list):
             # Parse the list of strings into a dictionary of variable-value pairs
             return {
-                variable: value
+                variable: round(value, 3)
                 for condition in input_values
                 for variable, value in [self._parse_equality_values(condition, input_type)]
             }
         elif isinstance(input_values, dict):
             # Return the provided dictionary directly
-            return input_values
+            if any([value for value in input_values.values() if not isinstance(value, float | int)]):
+                raise ValueError("All initial values must be of type float or int.")
+            return {name: round(value, 3) for name, value in input_values.items()}
         else:
             raise ValueError(f"{input_type} must be either a dictionary or a list of strings.")
 

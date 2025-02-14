@@ -13,16 +13,16 @@ from odeestimatorpy.helpers.collect_models import load_existing_models
 from odeestimatorpy.helpers.save_to_json import save_new_json
 from odeestimatorpy.models.linear_ode_model import LinearODEModel
 
-OUTPUT_DIR = r"..\..\output\identifiable"
 SMOOTH_DATA_PATTERN = re.compile(r"smoothed_data_(5|10|15)\.json")
 
 def process_single_system(system: dict):
     """Process a single ODE system: integrate, add noise, smooth, and estimate parameters."""
 
-    if "ID" not in system.keys():
+    if "directory" not in system.keys():
+        print("No directory specified")
         return
 
-    system_dir = os.path.join(OUTPUT_DIR, system["ID"])
+    system_dir = system["directory"]
 
     unconstrained_path = os.path.join(system_dir, "unconstrained.json")
 
@@ -42,6 +42,10 @@ def process_single_system(system: dict):
             executor.submit(process, model, system_dir, file)
             for file in os.listdir(system_dir) if SMOOTH_DATA_PATTERN.match(file)
         }
+
+        noise_free_future = executor.submit(process, model, system_dir, "data.json")
+        futures.add(noise_free_future)
+
         for future in concurrent.futures.as_completed(futures):
             future.result()  # Ensure all tasks complete
 
@@ -55,7 +59,8 @@ def process(model: LinearODEModel, system_dir: str, file: str):
 
     try:
         with open(os.path.join(system_dir, file), "r") as f:
-            smoothed_data = json.load(f)["data"]
+            content = json.load(f)
+            smoothed_data = content["y"] if "data" not in content else content["data"]
 
         with (open(os.path.join(system_dir, "data.json"), "r")) as f:
             x = json.load(f)["x"]
@@ -75,9 +80,7 @@ def process(model: LinearODEModel, system_dir: str, file: str):
         save_new_json({"parameters": estimated_params}, param_file)
 
     except Exception:
-        traceback.print_exc()
-        print("hi")
-
+        return
 
 
 def apply_constraints(system_data):
@@ -117,12 +120,12 @@ def apply_constraints(system_data):
 def process_ode_systems(batch_size=100):
     """Process ODE systems in batches using multiprocessing for parallelism."""
 
-    ode_systems = load_existing_models(OUTPUT_DIR)
+    ode_systems = load_existing_models(r"..\..\output")
 
     total_systems = len(ode_systems)
     print(f"Total systems to process: {total_systems}")
 
-    for i in tqdm(range(0, total_systems, batch_size), desc="Processing ODE systems"):
+    for i in tqdm(range(100, total_systems, batch_size), desc="Processing ODE systems"):
         batch = ode_systems[i: i + batch_size]
 
         # Use multiprocessing to process each ODE system in parallel
@@ -131,4 +134,4 @@ def process_ode_systems(batch_size=100):
 
 
 if __name__ == "__main__":
-    process_ode_systems(batch_size=100)
+    process_ode_systems()
