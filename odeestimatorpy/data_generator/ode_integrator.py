@@ -82,6 +82,8 @@ class ODEIntegrator:
         # First integration attempt
         result = solve_ivp(self.ode_system, self.t_span, self.initial_conditions, t_eval=t_eval, **solver_kwargs)
 
+        first_solution = {"y": result.y, "x": t_eval} if result.success else None
+
         # Check step sizes to detect possible stiffness
         if self.method is None:
             step_sizes = np.diff(result.t)
@@ -94,9 +96,12 @@ class ODEIntegrator:
 
         # Check if the integration was successful
         if not result.success:
-            raise RuntimeError("ODE integration failed!")
+            if first_solution:
+                print(f"Integration failed with BDF failed, returning solution with {method}.")
+                self.solution = first_solution
+        else:
+            self.solution = {"y": result.y, "x": t_eval}
 
-        self.solution = {"y": result.y, "x": t_eval}
         return self.solution
 
     def get_solution(self):

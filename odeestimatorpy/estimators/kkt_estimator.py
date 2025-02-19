@@ -1,7 +1,9 @@
 import numpy as np
+import sympy
 
 from scipy.linalg import block_diag
 from sympy import Eq, lambdify, Mul
+from sympy.stats import independent
 
 from odeestimatorpy.estimators.estimator import AbstractODEEstimator
 from odeestimatorpy.models.linear_ode_model import LinearODEModel
@@ -24,6 +26,7 @@ class KKTLinearODEParameterEstimator(AbstractODEEstimator):
 
         self.number_of_constraints = len(model.constraints)
         self.number_of_parameters = len(model.parameter_names)
+        self.input_values = [model.inputs[name] for name in sorted(model.inputs.keys())]
 
         self.index_by_parameter = {}
         self.independent_terms_by_equation = []
@@ -62,16 +65,15 @@ class KKTLinearODEParameterEstimator(AbstractODEEstimator):
                                               factor, modules=["numpy"]))
                     if param in self.index_by_parameter:
                         raise ValueError(f"Parameter {param} already used in another equation")
-                    self.index_by_parameter[param] = len(self.index_by_parameter)
+                    self.index_by_parameter[param.name] = len(self.index_by_parameter)
                     break
             else:
                 # If no parameter is found, store it as an independent term
                 independent_terms.append(term)
 
+        independent_terms = [lambdify([self.model.independent_variable] + self.model.variable_symbols + self.model.inputs_symbols, expr) for expr in independent_terms]
         # Store independent terms as a sum for later evaluation
-        self.independent_terms_by_equation.append(lambda *args: 0 if len(independent_terms) == 0 else
-                lambdify([self.model.independent_variable] + self.model.variable_symbols + self.model.inputs_symbols,
-                         sum(independent_terms), modules=["numpy"]))
+        self.independent_terms_by_equation.append(lambda *args: 0 if len(independent_terms) == 0 else sum(f(*args) for f in independent_terms))
 
         return callables
 
@@ -244,9 +246,10 @@ class KKTLinearODEParameterEstimator(AbstractODEEstimator):
         # Iterate through the equations in the system
         for i, callables in enumerate(self.callables_per_equation):
             # Iterate through the parameters in each equation
+            independent_term = self.independent_terms_by_equation[i]
             for basic_function in callables:
                 # Compute the scalar product derivative and accumulate it in b
-                b[row] += self._compute_weighted_derivative(i + 1, basic_function, self.ode_results)
+                b[row] += self._compute_weighted_derivative(i + 1, basic_function, independent_term, self.input_values, self.ode_results)
                 row += 1
 
         return b

@@ -120,16 +120,16 @@ def apply_constraints(system_data):
 def process_ode_systems(batch_size=100):
     """Process ODE systems in batches using multiprocessing for parallelism."""
 
-    ode_systems = load_existing_models(r"..\..\output")
+    ode_systems = load_existing_models(r"..\..\outputs-without-inputs\defined-models")
 
     total_systems = len(ode_systems)
     print(f"Total systems to process: {total_systems}")
 
-    for i in tqdm(range(100, total_systems, batch_size), desc="Processing ODE systems"):
+    for i in tqdm(range(0, total_systems, batch_size), desc="Processing ODE systems"):
         batch = ode_systems[i: i + batch_size]
 
         # Use multiprocessing to process each ODE system in parallel
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
             results = list(executor.map(process_single_system, batch))
 
 

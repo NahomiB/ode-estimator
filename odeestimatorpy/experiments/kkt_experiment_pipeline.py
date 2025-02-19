@@ -30,9 +30,6 @@ def process(save_dir, x, noise_level, model, y=None):
 
 def process_single_system(system):
 
-    if system["ID"] != "840620ce-b9ec-4923-bcc4-30fd1b831a89":
-        return
-
     save_dir = system['directory']
     model = LinearODEModel.from_dict(system)
 
@@ -42,7 +39,7 @@ def process_single_system(system):
         with open(data_path, "r") as f:
             data = json.load(f)
             x = np.array(data["x"])
-            y = np.array(data["y"])
+            y = np.array(data["y"]).T
     else:
        return
 
@@ -65,7 +62,7 @@ def process_single_system(system):
 def process_ode_systems(batch_size=100):
     """Process ODE systems in batches using multiprocessing for parallelism."""
 
-    ode_systems = load_existing_models("../../output/identifiable")
+    ode_systems = load_existing_models("../../outputs-one")
     total_systems = len(ode_systems)
     print(f"Total systems to process: {total_systems}")
 

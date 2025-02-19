@@ -13,6 +13,9 @@ def save_json(data, file_path):
         except FileNotFoundError:
             existing_data = []
 
+        if any(data["ID"] == item["ID"] for item in existing_data):
+            return
+
         existing_data.append(data)
 
         with open(file_path, "w") as f:
